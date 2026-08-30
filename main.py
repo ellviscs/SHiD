@@ -1,30 +1,74 @@
 import discord
-import ollama
+from discord.ext import commands
+import os
 
 f = open(".env")
 discord_token = f.readline().split('=', 1)[1]
+GUILD_ID = 1538342747738480700
+guild = discord.Object(id=GUILD_ID)
 
-intents = discord.Intents.default()
-intents.message_content = True
+class Bot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(command_prefix='$', intents=intents)
 
-client = discord.Client(intents=intents)
+    async def setup_hook(self):
+        # Looping untuk mencari semua file .py di dalam folder cogs
+        for filename in os.listdir('./cogs'):
+            if filename.endswith('.py'):
+                # Muat extension (nama folder dipisah dengan titik)
+                await self.load_extension(f'cogs.{filename[:-3]}')
+                print(f'Berhasil memuat cog: {filename}')
+
+        try:
+            self.tree.copy_global_to(guild=guild)
+            synced = await self.tree.sync(guild=guild)
+            print(f'Synced {len(synced)} commands to guild {guild.id}')
+
+        except Exception as e:
+            print(f'Error syncing commands: {e}')
+
+    async def on_ready(self):
+        print(f'Logged on as {self.user}!')
+
+bot = Bot()
+
+@bot.tree.command(name="reload", description="Reload any extension and configuration")
+@commands.is_owner()
+async def reload_config(interaction: discord.Interaction):
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            # Muat extension (nama folder dipisah dengan titik)
+            await bot.reload_extension(f'cogs.{filename[:-3]}')
+            print(f'Berhasil memuat cog: {filename}')
+
+    try:
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
+        await interaction.response.send_message(f'Synced {len(synced)} commands to guild {guild.id}')
+
+    except Exception as e:
+        await interaction.response.send_message(f'Error syncing commands: {e}')
 
 
-@client.event
-async def on_ready():
-    print(f'Logged on as {client.user}!')
 
-
-@client.event
-async def on_message(message):
-    print(f'Messages from {message.author}: {message.content}')
-    if message.author == client.user:
-        return
-
-    channel = message.channel
-    if channel.name == "do-not-post":
-        member = message.author
-        await member.ban(delete_message_days=1, reason= "SPAM!")
+# @bot.command()
+# async def test(ctx):
+#     await ctx.send('You must enter an argument!')
+# async def test(ctx, args):
+#     await ctx.send(args)
+#
+# @bot.tree.command(name='test', description='Tests command', guild = guild)
+# async def test(interaction: discord.Interaction):
+#     await interaction.response.send_message('Tests command')
+#
+# @bot.event
+# async def ban_spam(message):
+#     channel = message.channel
+#     if channel.name == "do-not-post":
+#         member = message.author
+#         await member.ban(delete_message_days=1, reason= "SPAM!")
 
 # VIBE CODED
 #     if message.content.startswith('!join'):
@@ -67,4 +111,4 @@ async def on_message(message):
 #             await message.channel.send("Bot sedang tidak ada di voice channel mana pun.")
 
 
-client.run(discord_token)
+bot.run(discord_token)

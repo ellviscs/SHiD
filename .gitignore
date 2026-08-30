@@ -1,3 +1,6 @@
 .venv
 .env
 .idea
+ffmpeg.exe
+
+cogs/__pycache__/*
