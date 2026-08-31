@@ -33,7 +33,7 @@ class General(commands.Cog):
 
     @app_commands.command(name="hello", description="Hello")
     async def hello(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Hello there!", ephemeral=True)
+        await interaction.response.send_message("Hello there!, I am a bot", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(General(bot))
