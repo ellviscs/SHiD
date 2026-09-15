@@ -1,11 +1,18 @@
 import discord
 from discord.ext import commands
 import os
+#from dotenv import load_dotenv
 
-f = open(".env")
-discord_token = f.readline().split('=', 1)[1]
-GUILD_ID = 1538342747738480700
-guild = discord.Object(id=GUILD_ID)
+discord_api_key = os.getenv("DISCORD_API_KEY")
+GUILD_ID = os.getenv("DISCORD_GUILD")
+
+if not discord_api_key:
+    raise ValueError("DISCORD_API_KEY not set")
+
+if not GUILD_ID:
+    raise ValueError("DISCORD_GUILD not set")
+
+guild = discord.Object(id=int(GUILD_ID))
 
 class Bot(commands.Bot):
     def __init__(self):
@@ -110,5 +117,8 @@ async def reload_config(interaction: discord.Interaction):
 #         else:
 #             await message.channel.send("Bot sedang tidak ada di voice channel mana pun.")
 
-
-bot.run(discord_token)
+try:
+    bot.run(discord_api_key)
+except Exception as e:
+    print(f"ERROR: {type(e).__name__}")
+    print(f"{e}")
