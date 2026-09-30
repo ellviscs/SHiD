@@ -26,9 +26,5 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            cd /opt/discordBot
-            git pull origin main
-            . .venv/bin/activate
-            python3 -m pip install -r requirement.txt
-            sudo /bin/systemctl restart discordbot.service
+            sudo /usr/local/bin/start-bot.sh
             exit
