@@ -1,0 +1,35 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags: 
+      - 'v*'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Docker Hub Login
+      uses: docker/login-action@v4.6.0
+      with:
+        username: ellviscs
+        password: ${{secrets.DOCKERHUB_TOKEN}}
+
+    - name: Docker Metadata
+      id: meta
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302
+      with:
+        images: ellviscs/discordbot
+        tags: |
+          type=semver,pattern={{version}}
+  
+    - name: Docker Image Build
+      uses: docker/build-push-action@v7.4.0
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
