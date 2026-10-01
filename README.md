@@ -7,7 +7,7 @@ Simply make a docker compose file like ``docker-compose.yml`` like this: <br>
 ````
 services:
   discordbot:
-    image: curmethyst07/discordbot:latest
+    image: ellviscs/discordbot:v0.1.0-alpha.1
     container_name: discordbot
     network_mode: "host"
     env_file:
