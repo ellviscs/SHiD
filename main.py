@@ -52,24 +52,6 @@ class Bot(commands.Bot):
 
 bot = Bot()
 
-# @bot.tree.command(name="reload", description="Reload any extension and configuration")
-# @commands.is_owner()
-# async def reload_config(interaction: discord.Interaction):
-#     await interaction.response.defer(ephemeral=True)
-#     for filename in os.listdir('./cogs'):
-#         if filename.endswith('.py'):
-#             # Muat extension (nama folder dipisah dengan titik)
-#             await bot.reload_extension(f'cogs.{filename[:-3]}')
-#             print(f'Successfully reload extension: {filename}')
-#
-#     try:
-#         bot.tree.copy_global_to(guild=guild)
-#         synced = await bot.tree.sync(guild=guild)
-#         await interaction.response.send_message(f'Synced {len(synced)} commands to guild {bot.guild.name}', ephemeral=True)
-#
-#     except Exception as e:
-#         await interaction.response.send_message(f'Error syncing commands: {e}', ephemeral=True)
-
 try:
     bot.run(DISCORD_API_KEY)
 except Exception as e:

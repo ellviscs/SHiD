@@ -13,18 +13,24 @@ class Music(commands.Cog):
         self.bot = bot
         self.player = None
         self.wavelink = bot.wavelink
+        self.autoplay = True
+        self.channel = None
         node = [self.wavelink.Node(uri=f"http://{bot.lavalink_host}:{bot.lavalink_port}", password=bot.lavalink_password)]
         asyncio.create_task(self.wavelink_connect(node))
         print("LavaLink setup complete.")
 
-    @app_commands.command(name="autoplay", description="Autoplay the music or not")
-    async def autoplay(self, interaction: discord.Interaction, bool: bool):
-        if bool:
+    async def autoplay_setup(self):
+        if self.autoplay:
             self.player.autoplay = wavelink.AutoPlayMode.enabled
-            await interaction.response.send_message(f"Autoplaying **{bool}**", ephemeral=True)
         else:
             self.player.autoplay = wavelink.AutoPlayMode.partial
-            await interaction.response.send_message(f"Autoplaying **{bool}**", ephemeral=True)
+
+    @app_commands.command(name="autoplay", description="Autoplay the music or not")
+    async def autoplay(self, interaction: discord.Interaction, autoplay : bool):
+        await interaction.response.defer(ephemeral=True)
+        self.autoplay = autoplay
+        await self.autoplay_setup()
+        await interaction.followup.send(f"The bot {"will" if autoplay else "won't"} autoplay recommended music", ephemeral=True)
 
     @app_commands.command(name="play", description="Play the music you want")
     @app_commands.describe(title="Song title you want to play")
@@ -32,20 +38,23 @@ class Music(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         tracks: wavelink.Search = await self.wavelink.Playable.search(title)
         if not tracks:
-            interaction.response.send_message(f"No tracks found for that {title}", ephemeral=True)
+            interaction.followup.send(f"No tracks found for that {title}", ephemeral=True)
             return
 
-        channel = interaction.user.voice.channel
+        self.channel = interaction.user.voice.channel
+        if not self.channel:
+            interaction.followup.send("You must join a voice channel first", ephemeral=True)
+
         self.player: wavelink.Player = interaction.guild.voice_client
         if not self.player:
-            self.player: wavelink.Player= await channel.connect(cls=wavelink.Player)
-            self.player.autoplay = wavelink.AutoPlayMode.enabled
+            self.player: wavelink.Player= await self.channel.connect(cls=wavelink.Player)
+            await self.autoplay_setup()
 
         track: wavelink.Playable = tracks[0]
-        await self.player.auto_queue.put_wait(track)
+        await self.player.queue.put_wait(track)
 
         if not self.player.playing:
-            await self.player.play(self.player.auto_queue.get())
+            await self.player.play(self.player.queue.get())
             await interaction.followup.send(f"Playing **{track.author} - {track.title}**", ephemeral=True)
             return
 
@@ -95,7 +104,14 @@ class Music(commands.Cog):
         self.player = None
         await interaction.followup.send(f"Stopped", ephemeral=True)
 
-
+    @commands.Cog.listener()
+    async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
+        embed: discord.Embed = discord.Embed(
+            title="Now Playing",
+            colour=discord.Colour.blue(),
+            description=f"[{payload.track.author} - {payload.track.title}]({payload.track.uri})",
+        )
+        await self.channel.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
