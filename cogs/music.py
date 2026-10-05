@@ -2,8 +2,18 @@ import asyncio
 import discord
 import wavelink
 from discord import app_commands
+from discord._types import ClientT
 from discord.ext import commands
 
+class NotInVoiceChannel(app_commands.CheckFailure):
+    pass
+
+def is_in_voice_channel():
+    def predicate(interaction: discord.Interaction) -> bool:
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            raise NotInVoiceChannel()
+        return True
+    return app_commands.check(predicate)
 
 class Music(commands.Cog):
     async def wavelink_connect(self, node):
@@ -34,6 +44,7 @@ class Music(commands.Cog):
 
     @app_commands.command(name="play", description="Play the music you want")
     @app_commands.describe(title="Song title you want to play")
+    @is_in_voice_channel()
     async def play(self, interaction: discord.Interaction, title: str):
         await interaction.response.defer(ephemeral=True)
         tracks: wavelink.Search = await self.wavelink.Playable.search(title)
@@ -42,8 +53,6 @@ class Music(commands.Cog):
             return
 
         self.channel = interaction.user.voice.channel
-        if not self.channel:
-            interaction.followup.send("You must join a voice channel first", ephemeral=True)
 
         self.player: wavelink.Player = interaction.guild.voice_client
         if not self.player:
@@ -112,6 +121,19 @@ class Music(commands.Cog):
             description=f"[{payload.track.author} - {payload.track.title}]({payload.track.uri})",
         )
         await self.channel.send(embed=embed)
+
+    async def cog_app_command_error(self, interaction: discord.Interaction[ClientT], error: app_commands.AppCommandError) -> None:
+
+        if isinstance(error, NotInVoiceChannel):
+            embed: discord.Embed = discord.Embed(
+                colour=discord.Colour.red(),
+                description="❌ You must join a voice channel first before using this command!",
+            )
+            await interaction.response.send_message(
+                embed=embed,
+                ephemeral=True
+            )
+
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
