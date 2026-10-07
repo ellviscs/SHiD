@@ -6,7 +6,7 @@ LABEL authors="EllvisCS"
 COPY requirement.txt ./
 RUN pip install -r requirement.txt
 
-COPY main.py ./
+COPY *.py ./
 COPY cogs ./cogs
 
 RUN useradd discordbot
