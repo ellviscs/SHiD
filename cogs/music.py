@@ -1,10 +1,11 @@
 import asyncio
-import discord
 import wavelink
-from discord import app_commands
+from discord.app_commands.checks import bot_has_permissions
+
 import checks
-from errors import NotInVoiceChannel
+from errors import *
 from discord.ext import commands
+from embeds import *
 
 class Music(commands.Cog):
     async def wavelink_connect(self, node):
@@ -16,6 +17,7 @@ class Music(commands.Cog):
         self.wavelink = bot.wavelink
         self.autoplay = True
         self.channel = None
+        self.message = None
         node = [self.wavelink.Node(uri=f"http://{bot.lavalink_host}:{bot.lavalink_port}", password=bot.lavalink_password)]
         asyncio.create_task(self.wavelink_connect(node))
         print("LavaLink setup complete.")
@@ -38,27 +40,31 @@ class Music(commands.Cog):
     @checks.is_in_voice_channel()
     async def play(self, interaction: discord.Interaction, title: str):
         await interaction.response.defer(ephemeral=True)
-        tracks: wavelink.Search = await self.wavelink.Playable.search(title)
+        tracks: wavelink.Search = await self.wavelink.Playable.search(title, source=wavelink.TrackSource.SoundCloud)
         if not tracks:
-            interaction.followup.send(f"No tracks found for that {title}", ephemeral=True)
+            await interaction.followup.send(embed=ErrorEmbed(f"`{title}` not found"), ephemeral=True)
             return
 
-        self.channel = interaction.user.voice.channel
+        channel_target = interaction.user.voice.channel
 
         self.player: wavelink.Player = interaction.guild.voice_client
         if not self.player:
-            self.player: wavelink.Player= await self.channel.connect(cls=wavelink.Player)
+            self.player: wavelink.Player= await channel_target.connect(cls=wavelink.Player)
             await self.autoplay_setup()
+
+        self.channel = self.player.channel
+        if self.channel != channel_target:
+            await self.player.move_to(channel_target)
 
         track: wavelink.Playable = tracks[0]
         await self.player.queue.put_wait(track)
 
         if not self.player.playing:
             await self.player.play(self.player.queue.get())
-            await interaction.followup.send(f"Playing **{track.author} - {track.title}**", ephemeral=True)
+            await interaction.followup.send(embed=InfoEmbed(f"Connected to {self.channel.name}"), ephemeral=True)
             return
 
-        await interaction.followup.send(f"Adding **{track.author} - {track.title}** to Queue", ephemeral=True)
+        await interaction.followup.send(embed=InfoEmbed(f"Adding **{track.author} - {track.title}** to Queue"), ephemeral=True)
 
     @app_commands.command(name="pause", description="Pause the music")
     async def pause(self, interaction: discord.Interaction):
@@ -99,30 +105,34 @@ class Music(commands.Cog):
             await interaction.followup.send("Already stopped", ephemeral=True)
             return
 
-        await self.player.stop()
         await self.player.disconnect()
         self.player = None
         await interaction.followup.send(f"Stopped", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-        embed: discord.Embed = discord.Embed(
-            title="Now Playing",
-            colour=discord.Colour.blue(),
-            description=f"[{payload.track.author} - {payload.track.title}]({payload.track.uri})",
+        embed: discord.Embed = NowPlayingEmbed(
+            f"[{payload.track.author} - {payload.track.title}]({payload.track.uri})",
+            f"{payload.track.artwork}",
         )
-        await self.channel.send(embed=embed)
+        self.message = await self.channel.send(embed=embed, silent=True)
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
+        await self.message.delete(delay=5)
+        self.message = None
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, NotInVoiceChannel):
-            embed: discord.Embed = discord.Embed(
-                colour=discord.Colour.red(),
-                description=":x: You are not in a voice channel",
-            )
+            embed = ErrorEmbed("You are not in a voice channel")
             await interaction.response.send_message(
                 embed=embed,
-                ephemeral=True
+                ephemeral=True,
             )
+
+        if isinstance(error, NotHavePermission):
+            embed = ErrorEmbed("You don't have permission to use this command")
+
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
