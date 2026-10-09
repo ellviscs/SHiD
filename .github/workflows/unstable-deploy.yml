@@ -1,4 +1,4 @@
-name: Deploy to Server (stable)
+name: Deploy to Server (non-stable)
 
 on:
   workflow_run:
