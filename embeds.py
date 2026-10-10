@@ -31,7 +31,7 @@ class NowPlayingEmbed(discord.Embed):
         super().__init__(
             title="Now Playing",
             colour=discord.Colour.blurple(),
-            description=f"{description}"
+            description=f"{description}"    
         )
 
         self.set_thumbnail(url=link)

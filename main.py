@@ -1,59 +1,37 @@
 import discord
 from discord.ext import commands
-import wavelink
-import os
+import logging
 
-DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
-GUILD_ID = os.getenv("DISCORD_GUILD")
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)-8s] %(name)s: %(message)s')
 
-if not DISCORD_API_KEY:
-    raise ValueError("DISCORD_API_KEY not set")
-
-if not GUILD_ID:
-    raise ValueError("DISCORD_GUILD not set")
-
-guild = discord.Object(id=int(GUILD_ID))
+import config
 
 class Bot(commands.Bot):
     def __init__(self):
-        intents = discord.Intents.default()
+        intents= discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix='$', intents=intents)
-        self.guild = None
-        self.wavelink = wavelink
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.gemini_global_instruction = os.getenv("GEMINI_GLOBAL_INSTRUCTION")
-        self.lavalink_host = os.getenv("LAVALINK_HOST")
-        self.lavalink_port = os.getenv("LAVALINK_PORT")
-        self.lavalink_password = os.getenv("LAVALINK_PASSWORD")
-        self.guild_chat_id = int(os.getenv("GUILD_CHAT_ID"))
 
     async def setup_hook(self):
-        self.guild = await self.fetch_guild(guild.id)
-        if self.lavalink_port and self.lavalink_host:
+        if config.ENABLE_MUSIC:
             await self.load_extension('cogs.music')
-            print("Successfully load Music Extensions")
-        if self.gemini_api_key:
-            await self.load_extension('cogs.chatbot')
-            print("Successfully load Chatbot Extensions")
-        await self.load_extension('cogs.general')
-        print("Successfully load General Extensions")
+            logging.info("Successfully load Music Extensions")
 
         try:
-            self.tree.copy_global_to(guild=guild)
-            synced = await self.tree.sync(guild=guild)
-            print(f'Synced {len(synced)} commands to {str(self.guild)}')
-
+            if not config.ENABLE_GLOBAL:
+                for GUILD_ID in config.GUILD_ID:
+                    target_guild = discord.Object(id=GUILD_ID)
+                    self.tree.copy_global_to(guild=target_guild)
+                    synced = await self.tree.sync(guild=target_guild)
+                    logging.info(f'Synced {len(synced)} commands to {str(await self.fetch_guild(target_guild.id))}')
+            else:
+                synced = await self.tree.sync()
+                logging.info(f'Synced {len(synced)} commands to global')
         except Exception as e:
-            print(f'Error syncing commands: {e}')
+            logging.error(f'Error syncing commands: {e}')
 
     async def on_ready(self):
-        print(f'Logged on as {self.user}!')
+        logging.info(f'Logged on as {self.user}!')
 
 bot = Bot()
-
-try:
-    bot.run(DISCORD_API_KEY)
-except Exception as e:
-    print(f"ERROR: {type(e).__name__}")
-    print(f"{e}")
+bot.run(config.DISCORD_API_KEY, log_handler=None, reconnect=True)
